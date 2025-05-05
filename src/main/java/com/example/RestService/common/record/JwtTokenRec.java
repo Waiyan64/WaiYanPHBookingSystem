@@ -1,0 +1,7 @@
+package com.example.RestService.common.record;
+
+import java.util.Date;
+
+public record JwtTokenRec(String token, Date expiresAt) {
+    
+}

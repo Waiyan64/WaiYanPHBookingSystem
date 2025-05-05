@@ -1,0 +1,101 @@
+# Server Configuration
+server:
+  port: 8084
+  servlet:
+    context-path: /api  # Optional: Adds a base path to all endpoints
+
+# Management & Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info,health,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+
+# API Documentation
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+# Spring Application Settings
+spring:
+  application:
+    name: RestService
+  
+  # Internationalization  
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+  
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/bookingsystem?useUnicode=true&characterEncoding=utf8&useSSL=false&useLegacyDatetimeCode=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      maximum-pool-size: 10
+      max-lifetime: 1800000
+      idle-timeout: 30000
+ 
+  # Batch Processing
+  batch:
+    jdbc:
+      initialize-schema: "always"
+    job:
+      enabled: false
+
+  # JPA/Hibernate Configuration
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create  # Important: This enables schema updates
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  # CORS Configuration  
+  app:
+    cors:
+      allowed-origins: '*'
+      allowed-methods: '*'
+      allowed-headers: '*'
+      exposed-headers: 'Authorization,Link,X-Total-Count,Set-Cookie,X-Auth-Token,x-api-key'
+      max-age: 1800
+    
+    # JWT Authentication
+    jwt:
+      password: d2Fzd29uZGVyZmlsbG5vaXNlc3BsaXRjcm93ZHNob3R1bmRlcmFycm93dGhyb3VnaG8=
+      expiration-time: 600000
+
+# Notification Services
+notification:
+  service:
+    sms:
+      mock: true
+    email:
+      mock: true
+
+# Activation Code Generation
+activation-code:
+  generation-service:
+    mock: true
+
+# Security Features
+white-list:
+  enable: false
+
+# File Storage Configuration
+app:
+  file-upload:
+    path: /excel-export
