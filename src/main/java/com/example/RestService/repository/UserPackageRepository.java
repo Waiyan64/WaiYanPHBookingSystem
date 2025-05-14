@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import com.example.RestService.entity.Country;
 import com.example.RestService.entity.User;
 import com.example.RestService.entity.UserPackage;
 
@@ -17,5 +18,5 @@ public interface UserPackageRepository extends JpaRepository<UserPackage, Long> 
     @Query("SELECT up FROM UserPackage up WHERE up.user = :user AND up.active = true " +
            "AND up.expiryDate > :now AND up.remainingCredits > 0 " +
            "AND up.packageInfo.country = :country")
-    List<UserPackage> findValidPackagesByUserAndCountry(User user, Long country, LocalDateTime now);
+    List<UserPackage> findValidPackagesByUserAndCountry(User user, Country country, LocalDateTime now);
 }

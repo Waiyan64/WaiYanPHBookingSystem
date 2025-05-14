@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -36,12 +35,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
                 TokenPayload payload = this.jwtTokenProvider.getPayloadFromToken(token);
                 
-                // Create authentication token with user ID as principal
-                // This matches what authenticationManager() does in SecurityConfig
+                //user ID as principal
+                
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        payload.getId().toString(),  // User ID as the principal
+                        payload.getId().toString(),  
                         null,  // No credentials needed after token validation
-                        Collections.emptyList()  // No authorities/roles for now
+                        Collections.emptyList()  // No authorities/roles 
                 );
     
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -64,5 +63,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         return null;
     }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+    String path = request.getServletPath();
+    return path.startsWith("/swagger-ui/") || 
+    path.startsWith("/v3/api-docs") || 
+    path.startsWith("/auth/test-token") ||
+    path.startsWith("/actuator/");   
+}
 }
 

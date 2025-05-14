@@ -1,32 +1,35 @@
 # Server Configuration
 server:
   port: 8084
-  servlet:
-    context-path: /api  # Optional: Adds a base path to all endpoints
+  # Optional: Adds a base path to all endpoints
 
 # Management & Monitoring
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
         include: info,health,prometheus
   metrics:
-    export:
-      prometheus:
-        enabled: true
+
     tags:
       application: ${spring.application.name}
 
-# API Documentation
+# SpringDoc Configuration
+
 springdoc:
   api-docs:
-    enabled: true
-  swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
+    enabled: true 
 
+ 
 # Spring Application Settings
 spring:
+  mvc:
+    static-path-pattern: /static/**
+
   application:
     name: RestService
   
@@ -37,7 +40,7 @@ spring:
   
   # Database Configuration
   datasource:
-    url: jdbc:mysql://localhost:3306/bookingsystem?useUnicode=true&characterEncoding=utf8&useSSL=false&useLegacyDatetimeCode=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/wyp_javadev_bookingsystem?useUnicode=true&characterEncoding=utf8&useSSL=false&useLegacyDatetimeCode=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -58,7 +61,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: create  # Important: This enables schema updates
+      ddl-auto: update  # Important: This enables schema updates
     properties:
       hibernate:
         format_sql: true
@@ -99,3 +102,10 @@ white-list:
 app:
   file-upload:
     path: /excel-export
+
+logging:
+  level:
+    org.springdoc: DEBUG
+    org.springframework.web: DEBUG
+    io.swagger: ERROR
+

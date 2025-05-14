@@ -24,6 +24,9 @@ public class Package extends BaseEntity {
     @Column(nullable = false)
     private Long price;
 
+    @Column(nullable = false)
+    private Long credit;
+
     @Column(name = "validity_days", nullable = false)
     private Integer validityDays;
 

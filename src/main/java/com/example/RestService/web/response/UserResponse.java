@@ -11,6 +11,8 @@ public class UserResponse {
     private String fullName;
     private boolean emailVerified;
     private boolean enabled;
+    private Long countryId;
+    private String countryName;
     
     public UserResponse(User user) {
         this.id = user.getId();
@@ -18,5 +20,9 @@ public class UserResponse {
         this.fullName = user.getFullName();
         this.emailVerified = user.isEmailVerified();
         this.enabled = user.isEnabled();
+        if ( user.getCountry() != null) { 
+            this.countryId = user.getCountry().getId();
+            this.countryName = user.getCountry().getName();
+        }
     }
 }

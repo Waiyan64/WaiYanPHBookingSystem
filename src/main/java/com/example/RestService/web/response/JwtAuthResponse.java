@@ -14,6 +14,7 @@ public class JwtAuthResponse {
     public JwtAuthResponse(String token, UserResponse userResponse) {
         this.token = token;
         this.userResponse = userResponse;
+        this.refreshToken = null;
     }
 
     public JwtAuthResponse(String token, String refreshToken, UserResponse userResponse) {

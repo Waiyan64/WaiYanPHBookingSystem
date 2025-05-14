@@ -6,7 +6,6 @@ import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,6 +20,7 @@ import com.example.RestService.entity.User;
 import com.example.RestService.entity.UserPackage;
 import com.example.RestService.repository.BookingRepository;
 import com.example.RestService.repository.ClassScheduleRepository;
+import com.example.RestService.repository.CountryRepository;
 import com.example.RestService.web.request.BookingRequest;
 
 import jakarta.transaction.Transactional;
@@ -32,8 +32,9 @@ public class BookingService {
     private final ClassScheduleRepository classScheduleRepository;
     private final UserService userService;
     private final PackageService packageService;
+    private final CountryRepository countryRepository;
     
-    // For handling concurrent bookings
+    // For concurrent bookings
     private final Lock bookingLock = new ReentrantLock();
     
     
@@ -41,11 +42,13 @@ public class BookingService {
             BookingRepository bookingRepository,
             ClassScheduleRepository classScheduleRepository,
             UserService userService,
-            PackageService packageService) {
+            PackageService packageService,
+            CountryRepository countryRepository) {
         this.bookingRepository = bookingRepository;
         this.classScheduleRepository = classScheduleRepository;
         this.userService = userService;
         this.packageService = packageService;
+        this.countryRepository = countryRepository;
     }
     
     public List<ClassSchedule> getUpcomingClasses() {
@@ -53,9 +56,9 @@ public class BookingService {
     }
     
     public List<ClassSchedule> getUpcomingClassesByCountry(Long countryId) {
-        Country country = new Country();
-        country.setId(countryId);
-        return classScheduleRepository.findUpcomingClassesByCountry(
+        Country country = countryRepository.findByCode(countryId)
+            .orElseThrow(() -> new ResourceNotFoundException("Country not found"));
+        return classScheduleRepository.findByCountryAndStartTimeAfterAndActiveTrue(
                 country, LocalDateTime.now());
     }
     
@@ -72,61 +75,51 @@ public class BookingService {
         User user = userService.getUserById(userId);
         ClassSchedule classSchedule = classScheduleRepository.findById(request.getClassId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found"));
-        UserPackage userPackage = packageService.getValidUserPackagesByCountry(userId, classSchedule.getCountry().getCode())
+        // Find the user package
+        UserPackage userPackage = packageService.getUserPackages(userId)
                 .stream()
                 .filter(up -> up.getId().equals(request.getUserPackageId()))
                 .findFirst()
                 .orElseThrow(() -> new BookingException("Invalid or expired package"));
-        
-        // Validate country match
+
+        // Making sure that the package country matches the class country
         if (!userPackage.getPackageInfo().getCountry().getId().equals(classSchedule.getCountry().getId())) {
-            throw new BookingException("Package country does not match class country");
+            throw new BookingException("Selected package does not match the class country");
         }
-        
-        // Check if class is in the future
+        // Class time frame validation
         if (classSchedule.isStarted() || classSchedule.isEnded()) {
             throw new BookingException("Cannot book a class that has already started or ended");
         }
-        
-        // Check for overlapping bookings
+        // Check for overlapping
         if (hasOverlappingBooking(user, classSchedule)) {
             throw new BookingException("You already have a booking that overlaps with this class time");
         }
-        
-        // Check if user has enough credits
+        // Check for enough credits
         if (userPackage.getRemainingCredits() < classSchedule.getRequiredCredits()) {
             throw new BookingException("Not enough credits in the package");
         }
         bookingLock.lock();
         try {
-            // Get the latest count of booked seats
             int bookedSeats = bookingRepository.countBookedSeats(classSchedule);
-            
             Booking booking = new Booking();
             booking.setUser(user);
             booking.setClassSchedule(classSchedule);
             booking.setUserPackage(userPackage);
             booking.setCreditsUsed(classSchedule.getRequiredCredits());
-            
-            if (bookedSeats < classSchedule.getTotalSlots()) {
-                // Regular booking
-                booking.setStatus(Booking.BookingStatus.BOOKED);
-                
-                // Update class booked slots
-                classSchedule.setBookedSlots(bookedSeats + 1);
-                classScheduleRepository.save(classSchedule);
-                
-                // Deduct credits
-                packageService.deductCredits(userPackage.getId(), classSchedule.getRequiredCredits());
-            } else {
-                // Waitlist booking
+            if (bookedSeats >= classSchedule.getTotalSlots()) {
+                // Waitlist 
                 booking.setStatus(Booking.BookingStatus.WAITLISTED);
-                
-                // Calculate waitlist position
                 int waitlistPosition = bookingRepository.findByClassScheduleAndStatusOrderByBookingTimeAsc(
                         classSchedule, Booking.BookingStatus.WAITLISTED).size() + 1;
                 booking.setWaitlistPosition(waitlistPosition);
+            } else {
+                // Regular 
+                booking.setStatus(Booking.BookingStatus.BOOKED);
+                classSchedule.setBookedSlots(bookedSeats + 1);
+                classScheduleRepository.save(classSchedule);
             }
+            // Deduct credits for both 
+            packageService.deductCredits(userPackage.getId(), classSchedule.getRequiredCredits());
             return bookingRepository.save(booking);
         } finally {
             bookingLock.unlock();
@@ -134,18 +127,18 @@ public class BookingService {
     }
 
     @Transactional
-    @CacheEvict(value = "classAvailability", key = "#classId")
+    @CacheEvict(value = "classAvailability")
     public void cancelBooking(Long userId, Long bookingId) {
         User user = userService.getUserById(userId);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
         
-        // Verify the booking belongs to the user
+        // Verify the booking with the user
         if (!booking.getUser().getId().equals(userId)) {
             throw new BookingException("This booking doesn't belong to the user");
         }
         
-        // Check if the class has already started
+        // Check if started
         if (booking.getClassSchedule().isStarted()) {
             throw new BookingException("Cannot cancel a booking for a class that has already started");
         }
@@ -153,27 +146,28 @@ public class BookingService {
         ClassSchedule classSchedule = booking.getClassSchedule();
         
         if (booking.getStatus() == Booking.BookingStatus.BOOKED) {
-            // For booked classes, we need to handle credits refund based on cancellation time
+            
             booking.setStatus(Booking.BookingStatus.CANCELLED);
             booking.setCancellationTime(LocalDateTime.now());
             
-            // Update class booked slots
+            
             classSchedule.setBookedSlots(classSchedule.getBookedSlots() - 1);
             classScheduleRepository.save(classSchedule);
             
-            if (booking.canRefund()) {
+            // Check if canceled at least 4 hours before class start
+            if (classSchedule.getStartTime().minusHours(4).isAfter(LocalDateTime.now())) {
                 packageService.refundCredits(
                         booking.getUserPackage().getId(), booking.getCreditsUsed());
             }
             
-            // Process any waitlist entries
+            // Process waitlist 
             processWaitlist(classSchedule.getId());
         } else if (booking.getStatus() == Booking.BookingStatus.WAITLISTED) {
-            // For waitlisted bookings, just cancel
+            
             booking.setStatus(Booking.BookingStatus.CANCELLED);
             booking.setCancellationTime(LocalDateTime.now());
             
-            // Update waitlist positions for everyone behind this booking
+            // Update waitlist positions 
             List<Booking> waitlistBookings = bookingRepository.findByClassScheduleAndStatusOrderByBookingTimeAsc(
                     classSchedule, Booking.BookingStatus.WAITLISTED);
             
@@ -194,17 +188,17 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
         
-        // Verify the booking belongs to the user
+        // Verify the booking with the user
         if (!booking.getUser().getId().equals(userId)) {
             throw new BookingException("This booking doesn't belong to the user");
         }
         
-        // Verify the booking is in BOOKED status
+        
         if (booking.getStatus() != Booking.BookingStatus.BOOKED) {
             throw new BookingException("Cannot check in to a non-booked class");
         }
         
-        // Verify the class has started but not ended
+        // Verify the class validity
         ClassSchedule classSchedule = booking.getClassSchedule();
         LocalDateTime now = LocalDateTime.now();
         
@@ -247,15 +241,15 @@ public class BookingService {
                  Booking booking = nextWaitlistedBooking.get();
                  UserPackage userPackage = booking.getUserPackage();
                  
-                 // Verify user package still has enough credits
+                 // Verify for enough credits
                  if (userPackage.getRemainingCredits() >= classSchedule.getRequiredCredits() &&
                          !userPackage.isExpired()) {
                      
-                     // Move from waitlist to booked
+                     // from waitlist to booked
                      booking.setStatus(Booking.BookingStatus.BOOKED);
                      booking.setWaitlistPosition(null);
                      
-                     // Update class booked slots
+                     // Update slots
                      classSchedule.setBookedSlots(classSchedule.getBookedSlots() + 1);
                      classScheduleRepository.save(classSchedule);
                      
@@ -263,12 +257,12 @@ public class BookingService {
                      packageService.deductCredits(userPackage.getId(), classSchedule.getRequiredCredits());
                      
                      bookingRepository.save(booking);
-                    // Notify user (in a real app, this would send an email/push notification)
+                    // Notify user 
                     System.out.println("Notifying user " + booking.getUser().getEmail() + 
                     " that they've been moved from waitlist to booked for class " + 
                     classSchedule.getTitle());
                 } else {
-                    // If not enough credits or package expired, cancel the waitlist and try next person
+                    // For various reasons -If not enough credits or package expired, cancel the waitlist and try next person
                     booking.setStatus(Booking.BookingStatus.CANCELLED);
                     booking.setCancellationTime(LocalDateTime.now());
                     bookingRepository.save(booking);
@@ -284,23 +278,21 @@ public class BookingService {
     @Transactional
     public void processCompletedClasses() {
         List<ClassSchedule> completedClasses = classScheduleRepository.findCompletedClasses(LocalDateTime.now());
-        
         for (ClassSchedule classSchedule : completedClasses) {
             List<Booking> waitlistedBookings = bookingRepository.findByClassScheduleAndStatusOrderByBookingTimeAsc(
                     classSchedule, Booking.BookingStatus.WAITLISTED);
-            
             // Mark as inactive to avoid processing again
             classSchedule.setActive(false);
             classScheduleRepository.save(classSchedule);
-            
-            // No action needed for waitlisted bookings as they don't have credits deducted
-            // Just mark as cancelled
+            // Refund credits for waitlisted 
             for (Booking booking : waitlistedBookings) {
                 booking.setStatus(Booking.BookingStatus.CANCELLED);
                 booking.setCancellationTime(LocalDateTime.now());
+                // Refund credits 
+                packageService.refundCredits(
+                    booking.getUserPackage().getId(), booking.getCreditsUsed());
                 bookingRepository.save(booking);
             }
-            
             // Mark booked classes as completed
             List<Booking> bookedBookings = bookingRepository.findByClassScheduleAndStatusOrderByBookingTimeAsc(
                     classSchedule, Booking.BookingStatus.BOOKED);

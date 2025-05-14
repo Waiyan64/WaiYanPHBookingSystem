@@ -44,7 +44,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 )
         );
         
-        // Get user from repository
+        // Get user 
         User user = userRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
@@ -57,7 +57,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         
         // Build and return response
         UserResponse userResponse = new UserResponse(user);
-        return new JwtAuthResponse(token, refreshToken.getTokenId(), userResponse);
+        return new JwtAuthResponse(token, refreshToken.getToken(), userResponse);
     }
 
     @Override
@@ -78,19 +78,19 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         // Create new refresh token
         RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getId());
         
-        // Build and return response
+        
         UserResponse userResponse = new UserResponse(user);
-        return new JwtAuthResponse(jwtToken, newRefreshToken.getTokenId(), userResponse);
+        return new JwtAuthResponse(jwtToken, newRefreshToken.getToken(), userResponse);
     }
 
      @Override
     public JwtAuthResponse register(RegistrationRequest request) {
         LOGGER.info("Registration attempt for email: {}", request.getEmail());
         
-        // Register user - UserService handles validation, password encoding, etc.
+        // Register user 
         User user = userService.registerUser(request);
         
-        // Send verification email - Mock implementation
+        // Send verification email- Mock
         sendVerificationEmail(user);
         
         // Generate JWT token
@@ -100,9 +100,9 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         // Create refresh token
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
         
-        // Build and return response
+        
         UserResponse userResponse = new UserResponse(user);
-        return new JwtAuthResponse(token, refreshToken.getTokenId(), userResponse);
+        return new JwtAuthResponse(token, refreshToken.getToken(), userResponse);
     }
 
     @Override
@@ -123,10 +123,10 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         return userService.resetPassword(token, newPassword);
     }
     
-    // Mock email verification - in a real system, this would send an actual email
+    // Mock email verification 
     private boolean sendVerificationEmail(User user) {
         LOGGER.info("Sending verification email to: {}", user.getEmail());
-        // Mock implementation - always returns true
+        // Mock implementation
         return true;
     }
  

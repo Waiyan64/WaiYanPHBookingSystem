@@ -17,9 +17,12 @@ import com.example.RestService.entity.Package;
 
 import com.example.RestService.entity.UserPackage;
 import com.example.RestService.service.PackageService;
+import com.example.RestService.web.request.PackageCreateRequest;
 import com.example.RestService.web.request.PackagePurchaseRequest;
 import com.example.RestService.web.response.PackageResponse;
 import com.example.RestService.web.response.UserPackageResponse;
+
+
 
 import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.validation.Valid;
@@ -34,7 +37,6 @@ public class PackageController {
     public PackageController(PackageService packageService) {
         this.packageService = packageService;
     }
-    
     @GetMapping
     public ResponseEntity<List<PackageResponse>> getAllPackages() {
         List<com.example.RestService.entity.Package> packages = packageService.getAllPackages();
@@ -44,6 +46,14 @@ public class PackageController {
         
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/create")
+    public ResponseEntity<PackageResponse> createPackage(@Valid @RequestBody PackageCreateRequest packageRequest) {
+        Package createPackage = packageService.createPackage(packageRequest);
+        PackageResponse response = new PackageResponse(createPackage);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+    
     
     @GetMapping("/country/{countryId}")
     public ResponseEntity<List<PackageResponse>> getPackagesByCountry(@PathVariable Long countryId) {

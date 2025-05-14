@@ -7,4 +7,6 @@ public interface IRefreshTokenService {
 
     RefreshToken validateRefreshToken(String tokenId);
 
+    void deleteByUserId(Long userId);
+
 }

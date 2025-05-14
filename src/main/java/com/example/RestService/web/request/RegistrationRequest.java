@@ -18,4 +18,7 @@ public class RegistrationRequest {
 
     @NotBlank
     private String password;
+
+    @NotNull
+    private Long countryCode;
 }

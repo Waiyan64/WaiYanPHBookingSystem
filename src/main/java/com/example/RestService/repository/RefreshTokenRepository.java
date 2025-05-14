@@ -2,18 +2,21 @@ package com.example.RestService.repository;
 
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 
 import com.example.RestService.entity.RefreshToken;
 
+import jakarta.transaction.Transactional;
+
 @Repository
 public interface RefreshTokenRepository extends BaseRepository<RefreshToken, Long>{
-    Optional<RefreshToken> findByTokenId(String tokenId);
+    Optional<RefreshToken> findByToken(String tokenId);
+    Optional<RefreshToken> findByUserId(Long userId);
+    
 
-    Optional<RefreshToken> findByCustomerId(Long customerId);
-
-    Optional<RefreshToken> findByMerchantId(Long merchantId);
-
-    Optional<RefreshToken> findByAdminId(Long adminId);
+    @Modifying
+    @Transactional
+    void deleteByUserId(Long userId);
     
 } 

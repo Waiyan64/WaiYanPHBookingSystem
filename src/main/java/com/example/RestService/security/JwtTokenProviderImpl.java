@@ -7,6 +7,7 @@ import javax.crypto.SecretKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
@@ -20,13 +21,16 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.AllArgsConstructor;
+
 import com.example.RestService.entity.User;
 
-@AllArgsConstructor
+
 @Component
 @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class JwtTokenProviderImpl implements JwtTokenProvider {
+
+    private static final String SECRET_KEY = "secret-key";
+    private static final long EXPIRATION_TIME = 86400000;
     private static final Logger LOGGER = LoggerFactory.getLogger(JwtTokenProviderImpl.class);
 
    @Value("${app.jwt.secret:defaultSecretKeyThatIsLongEnoughForHS512SignatureAlgorithm}")
@@ -35,12 +39,20 @@ public class JwtTokenProviderImpl implements JwtTokenProvider {
     @Value("${app.jwt.expiration-minutes:60}")
     private long jwtExpirationMinutes;
     
-    private final UserRepository userRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public JwtTokenProviderImpl() {
+        // Default constructor 
+    }
+
     
     public JwtTokenProviderImpl(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
+ 
    @Override
     public String generateToken(TokenPayload payload) {
         Date now = new Date();
@@ -76,8 +88,14 @@ public class JwtTokenProviderImpl implements JwtTokenProvider {
    @Override
    public TokenPayload getPayloadFromToken(String token) {
     SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-    Claims claims = Jwts.parser().decryptWith(key)
-               .build().parseEncryptedClaims(token).getPayload();
+    
+
+    Claims claims = Jwts.parser()
+            .verifyWith(key)
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
+            
 
                TokenPayload payload = new TokenPayload();
                payload.setId(claims.get("id", Long.class));
@@ -94,8 +112,9 @@ public class JwtTokenProviderImpl implements JwtTokenProvider {
        try {
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         Jwts.parser()
-               .decryptWith(key)
-               .build().parseEncryptedClaims(token);
+               .verifyWith(key)
+               .build()
+               .parseSignedClaims(token);
            return true;
        } catch (ExpiredJwtException var1) {
            LOGGER.error("ValidateToken() Token Expired");

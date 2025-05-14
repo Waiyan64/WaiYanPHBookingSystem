@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import com.example.RestService.entity.Booking;
 
 import lombok.Getter;
-import lombok.Setter;
 
 @Getter
 public class BookingResponse {
