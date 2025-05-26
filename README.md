@@ -2,7 +2,7 @@
 
 API Documentation
 Access the API documentation after starting the application:
-http://localhost:8084/swagger-ui.html
+http://localhost:8084/swagger-ui/index.html#/
 
 Configuration
 The application uses the following configuration:
